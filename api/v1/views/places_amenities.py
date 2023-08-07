@@ -1,88 +1,86 @@
 #!/usr/bin/python3
-"""places_amenities"""
+""" Places amenities routes handler """
 from api.v1.views import app_views
 from flask import jsonify, abort, request
 from models import storage
-from models.place import Place
-from models.amenity import Amenity
-from datetime import datetime
-import uuid
-from os import getenv
+from models import place
+from models import amenity
 
-if getenv('HBNB_TYPE_STORAGE') == 'db':
-    @app_views.route('/places/<place_id>/amenities', methods=['GET'])
-    @app_views.route('/places/<place_id>/amenities/', methods=['GET'])
-    def list_amenities_of_place(place_id):
-        ''' Retrieves a list of all Amenity objects of a Place '''
-        all_places = storage.all("Place").values()
-        place_obj = [obj.to_dict() for obj in all_places if obj.id == place_id]
-        if place_obj == []:
-            abort(404)
-        list_amenities = []
-        for obj in all_places:
-            if obj.id == place_id:
-                for amenity in obj.amenities:
-                    list_amenities.append(amenity.to_dict())
-        return jsonify(list_amenities)
 
-    @app_views.route('/places/<place_id>/amenities/<amenity_id>',
-                     methods=['POST'])
-    def create_place_amenity(place_id, amenity_id):
-        '''Creates a Amenity'''
-        all_places = storage.all("Place").values()
-        place_obj = [obj.to_dict() for obj in all_places if obj.id == place_id]
-        if place_obj == []:
-            abort(404)
+def do_check_id(cls, amenity_id):
+    """
+    If the cls is not linked to any Cls object, raise a 404 error
+    """
+    try:
+        get_amenity = storage.get(cls, amenity_id)
+        get_amenity.to_dict()
+    except Exception:
+        abort(404)
+    return get_amenity
 
-        all_amenities = storage.all("Amenity").values()
-        amenity_obj = [obj.to_dict() for obj in all_amenities
-                       if obj.id == amenity_id]
-        if amenity_obj == []:
-            abort(404)
 
-        amenities = []
-        for place in all_places:
-            if place.id == place_id:
-                for amenity in all_amenities:
-                    if amenity.id == amenity_id:
-                        place.amenities.append(amenity)
-                        storage.save()
-                        amenities.append(amenity.to_dict())
-                        return jsonify(amenities[0]), 200
-        return jsonify(amenities[0]), 201
+def do_get_amenities(place_id):
+    """
+       Retrieves the list of all Amenity objects
+       if amenity_id is not none get a Amenity object
+    """
+    do_check_id(place.Place, place_id)
+    my_place = storage.get(place.Place, place_id)
+    try:
+        all_amenities = my_place.amenities
+    except Exception:
+        abort(404)
+    amenities = []
+    for c in all_amenities:
+        amenities.append(c.to_dict())
+    return jsonify(amenities)
 
-    @app_views.route('/places/<place_id>/amenities/<amenity_id>',
-                     methods=['DELETE'])
-    def delete_place_amenity(place_id, amenity_id):
-        '''Deletes a Amenity object'''
-        all_places = storage.all("Place").values()
-        place_obj = [obj.to_dict() for obj in all_places if obj.id == place_id]
-        if place_obj == []:
-            abort(404)
 
-        all_amenities = storage.all("Amenity").values()
-        amenity_obj = [obj.to_dict() for obj in all_amenities
-                       if obj.id == amenity_id]
-        if amenity_obj == []:
-            abort(404)
-        amenity_obj.remove(amenity_obj[0])
+def do_delete_amenity(place_id, amenity_id):
+    """
+        Deletes the link between Amenity object and a Place
+        Return: an empty dictionary with the status code 200
+    """
+    my_place = do_check_id(place.Place, place_id)
+    do_check_id(amenity.Amenity, amenity_id)
+    for i in range(len(my_place.amenities)):
+        if (my_place.amenities[i].id == amenity_id):
+            del(my_place.amenities[i])
+            storage.save()
+            response = {}
+            return jsonify(response), 200
+    abort(404)
 
-        for obj in all_places:
-            if obj.id == place_id:
-                if obj.amenities == []:
-                    abort(404)
-                for amenity in obj.amenities:
-                    if amenity.id == amenity_id:
-                        storage.delete(amenity)
-                        storage.save()
-        return jsonify({}), 200
 
-    @app_views.route('/amenities/<amenity_id>', methods=['GET'])
-    def get_place_amenity(amenity_id):
-        """Retrieves a Amenity object"""
-        all_amenities = storage.all("Amenity").values()
-        amenity_obj = [obj.to_dict() for obj in
-                       all_amenities if obj.id == amenity_id]
-        if amenity_obj == []:
-            abort(404)
-        return jsonify(amenity_object[0])
+def do_create_amenity(place_id, amenity_id):
+    """
+        Links a amenity object
+        Return: linked amenity object
+    """
+    my_place = do_check_id(place.Place, place_id)
+    get_amenity = do_check_id(amenity.Amenity, amenity_id)
+    for i in range(len(my_place.amenities)):
+        if (my_place.amenities[i].id == amenity_id):
+            return jsonify(get_amenity.to_dict()), 200
+    my_place.amenities.append(get_amenity)
+    storage.save()
+    return jsonify(get_amenity.to_dict()), 201
+
+
+@app_views.route('/places/<place_id>/amenities',
+                 methods=['GET'],
+                 defaults={'amenity_id': None},
+                 strict_slashes=False)
+@app_views.route('/places/<place_id>/amenities/<amenity_id>',
+                 methods=['DELETE', 'POST'],
+                 strict_slashes=False)
+def places_amenities(place_id, amenity_id):
+    """
+        Handle amenities requests with needed functions
+    """
+    if (request.method == "GET"):
+        return do_get_amenities(place_id)
+    elif (request.method == "DELETE"):
+        return do_delete_amenity(place_id, amenity_id)
+    elif (request.method == "POST"):
+        return do_create_amenity(place_id, amenity_id)
