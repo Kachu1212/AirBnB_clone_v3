@@ -72,7 +72,8 @@ def delete_city(city_id):
 
 @app_views.route('/cities/<city_id>', methods=['PUT'])
 def updates_city(city_id):
-    """Updates a City object"""
+    
+    """Updates a City object """
     list_all_cities = storage.all("City").values()
     city_obj = [obj.to_dict() for obj in list_all_cities if obj.id == city_id]
     if city_obj == []:
