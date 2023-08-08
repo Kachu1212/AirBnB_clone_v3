@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 """ holds class User"""
+import hashlib
 import models
 from models.base_model import BaseModel, Base
 from os import getenv
 import sqlalchemy
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
-import hashlib
+
 
 class User(BaseModel, Base):
     """Representation of a user """
@@ -26,7 +27,6 @@ class User(BaseModel, Base):
             cascade="all, delete, delete-orphan",
             backref="user"
         )
-       
     else:
         email = ""
         password = ""
